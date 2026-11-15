@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saffron PDF</title>
+<meta name="theme-color" content="#5b2d8e">
+<meta name="description" content="Saffron PDF: read, annotate, sign, organise and fill PDFs offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="pdf-lib.min.js"></script>
+<style>
+:root{
+  --bg:#f4f2f7; --panel:#ffffff; --ink:#1f1a2b; --muted:#6b6478; --line:#e3dfea;
+  --brand:#5b2d8e; --brand-2:#7a45b5; --accent:#e8822a; --danger:#c62828;
+  --shadow:0 1px 2px rgba(31,26,43,.06),0 4px 16px rgba(31,26,43,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#16131c;--panel:#211d2a;--ink:#ece8f3;--muted:#a59fb2;--line:#363042;--shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.35)}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--bg);-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+#app{display:flex;flex-direction:column;height:100%}
+/* top bar */
+.top{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);min-height:52px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.logo svg{flex:none}
+.docname{flex:1;min-width:0;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:7px 11px;font-size:14px;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--brand-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-2)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn:disabled{opacity:.45;cursor:default}
+.btn svg{width:18px;height:18px;flex:none}
+.hide-sm{}
+@media (max-width:640px){.hide-sm{display:none}.btn{padding:7px 9px}}
+/* toolbar */
+.tools{display:flex;align-items:center;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tools::-webkit-scrollbar{display:none}
+.tool{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:52px;padding:5px 6px;border-radius:10px;border:1px solid transparent;background:transparent;font-size:11px;color:var(--muted)}
+.tool svg{width:20px;height:20px}
+.tool.on{background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);border-color:color-mix(in srgb,var(--brand) 30%,transparent)}
+@media (prefers-color-scheme: dark){.tool.on{color:#c9a8f0}}
+.tool:disabled{opacity:.4}
+.sep{width:1px;align-self:stretch;background:var(--line);margin:2px 4px;flex:none}
+.swatches{display:flex;gap:5px;padding:0 4px}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);flex:none}
+.sw.on{box-shadow:0 0 0 2px var(--brand)}
+.mini{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
+.mini select{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:3px 4px}
+.zoomlbl{min-width:46px;text-align:center;font-size:12px;color:var(--muted)}
+/* body */
+.body{flex:1;display:flex;min-height:0;position:relative}
+.side{width:200px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.side.right{border-right:0;border-left:1px solid var(--line);width:300px}
+.side-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px}
+.side-b{flex:1;overflow:auto;padding:10px}
+.side-f{border-top:1px solid var(--line);padding:8px;display:flex;flex-wrap:wrap;gap:6px}
+.side-f .btn{font-size:12px;padding:5px 8px}
+@media (max-width:820px){
+  .side{position:absolute;top:0;bottom:0;left:0;z-index:20;box-shadow:var(--shadow);width:min(260px,82vw)}
+  .side.right{left:auto;right:0;width:min(340px,92vw)}
+}
+.thumb{position:relative;margin:0 auto 12px;width:130px;cursor:pointer;user-select:none}
+.thumb .tc{background:#fff;box-shadow:var(--shadow);border:2px solid transparent;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:60px}
+.thumb.cur .tc{border-color:var(--accent)}
+.thumb.sel .tc{border-color:var(--brand)}
+.thumb canvas{display:block;max-width:100%}
+.thumb .tn{text-align:center;font-size:12px;color:var(--muted);margin-top:4px}
+.thumb .ck{position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:6px;border:2px solid var(--brand);background:var(--panel);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
+.thumb.sel .ck{background:var(--brand)}
+.thumb.dragover .tc{outline:3px dashed var(--accent);outline-offset:3px}
+.main{flex:1;overflow:auto;position:relative;min-width:0}
+.pages{display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding:16px 12px 80px;width:fit-content;min-width:100%}
+.page{position:relative;background:#fff;box-shadow:var(--shadow);flex:none;margin:0 auto}
+.page canvas{position:absolute;inset:0;width:100%;height:100%}
+.page .ov{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.page .pn{position:absolute;bottom:-14px;right:0;font-size:11px;color:var(--muted)}
+.ov.draw{touch-action:none;cursor:crosshair}
+.ov.pass{pointer-events:none}
+.ov.pass [data-a]{pointer-events:auto;cursor:move;touch-action:none}
+.ov.erase{pointer-events:none}
+.ov.erase [data-a]{pointer-events:auto;cursor:not-allowed}
+.ov .selbox{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4;pointer-events:none}
+/* empty */
+.empty{max-width:760px;margin:6vh auto;padding:0 16px;text-align:center}
+.drop{border:2px dashed color-mix(in srgb,var(--brand) 40%,var(--line));border-radius:20px;padding:40px 20px;background:var(--panel)}
+.drop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--panel))}
+.drop h1{font-size:26px;margin:10px 0 6px;letter-spacing:-.02em}
+.drop p{color:var(--muted);margin:0 0 20px}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:22px;text-align:left}
+.feat div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:13px;color:var(--muted)}
+.feat b{display:block;color:var(--ink);font-size:14px;margin-bottom:3px}
+/* floating selection bar */
+.selbar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:14px;padding:6px;display:none;gap:4px;box-shadow:var(--shadow);z-index:30}
+.selbar button{background:transparent;border:0;color:inherit;padding:8px 12px;border-radius:10px;font-size:14px}
+.selbar button:hover{background:rgba(255,255,255,.12)}
+/* dialogs */
+.scrim{position:fixed;inset:0;background:rgba(20,14,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.dlg{background:var(--panel);border-radius:16px;box-shadow:var(--shadow);width:min(520px,100%);max-height:90vh;overflow:auto;padding:18px}
+.dlg h3{margin:0 0 12px;font-size:17px}
+.dlg .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.dlg textarea,.dlg input[type=text],.dlg input[type=password],.dlg select{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:var(--bg)}
+.dlg label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:13px}
+.tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.sigpad{width:100%;height:180px;border:1px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;display:block}
+.toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:10px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center}
+.res{padding:8px;border-radius:8px;cursor:pointer;font-size:13px;border:1px solid transparent}
+.res:hover{border-color:var(--line);background:var(--bg)}
+.res b{color:var(--brand)}
+.res mark{background:#ffe08a;color:#000;border-radius:2px}
+.field{margin-bottom:10px}
+.field label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px;word-break:break-all}
+.field input[type=text],.field select{width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--bg)}
+.muted{color:var(--muted);font-size:13px}
+.busy{position:fixed;inset:0;background:rgba(20,14,30,.35);display:none;align-items:center;justify-content:center;z-index:70;color:#fff;font-weight:600}
+.busy div{background:var(--ink);color:var(--bg);padding:14px 18px;border-radius:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="5" y="3" width="20" height="26" rx="3" fill="#5b2d8e"/>
+        <path d="M19 3v6h6" fill="#7a45b5"/>
+        <path d="M15 22c0-5 1-9 4-12M15 22c-1-4-3-7-6-8M15 22c2-3 5-4 8-4" stroke="#e8822a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span>Saffron PDF</span>
+    </div>
+    <div class="docname" id="docname"></div>
+    <button class="btn" id="bOpen" title="Open a PDF or images"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="hide-sm">Open</span></button>
+    <button class="btn" id="bAdd" title="Merge: add PDFs or images to the end" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span class="hide-sm">Add files</span></button>
+    <button class="btn" id="bMore" title="More" disabled><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+    <button class="btn primary" id="bSave" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg><span>Save</span></button>
+  </div>
+  <div class="tools" id="tools" style="display:none">
+    <button class="tool" id="tPages" title="Pages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="9" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/><rect x="14" y="15" width="7" height="6" rx="1"/></svg>Pages</button>
+    <div class="sep"></div>
+    <button class="tool on" data-tool="select" title="Select & move"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg>Select</button>
+    <button class="tool" data-tool="ink" title="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l4-1L19 8l-3-3L5 16z"/></svg>Pen</button>
+    <button class="tool" data-tool="hl" title="Highlight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14l-4 4v2h6l2-2M9 14l8-8 3 3-8 8z"/></svg>Highlight</button>
+    <button class="tool" data-tool="text" title="Add text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>Text</button>
+    <button class="tool" data-tool="rect" title="Rectangle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>Box</button>
+    <button class="tool" data-tool="sign" title="Signature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c3-6 5-9 6-8s-3 8-1 8 3-5 5-5 1 4 3 4 3-2 5-2M3 21h18"/></svg>Sign</button>
+    <button class="tool" data-tool="redact" title="Redact (permanently removes what is under the box on save)"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>Redact</button>
+    <button class="tool" data-tool="erase" title="Eraser: tap a mark to delete it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 20h12M5 15l8-8 5 5-6 6H8z"/></svg>Erase</button>
+    <div class="sep"></div>
+    <div class="swatches" id="swatches"></div>
+    <label class="mini">Size <select id="wSel"><option value="1">Thin</option><option value="2" selected>Medium</option><option value="4">Thick</option></select></label>
+    <div class="sep"></div>
+    <button class="tool" id="tUndo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</button>
+    <button class="tool" id="tRedo" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></svg>Redo</button>
+    <div class="sep"></div>
+    <button class="tool" id="tOut" title="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg>Out</button>
+    <div class="zoomlbl" id="zoomLbl">100%</div>
+    <button class="tool" id="tIn" title="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg>In</button>
+    <button class="tool" id="tFit" title="Fit width"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3"/></svg>Fit</button>
+    <div class="sep"></div>
+    <button class="tool" id="tSearch" title="Search text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Search</button>
+    <button class="tool" id="tForms" title="Fill form fields"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6M7 17h4"/></svg>Forms</button>
+    <div class="mini" style="padding:0 6px"><span id="pageInd">–</span></div>
+  </div>
+  <div class="body">
+    <aside class="side" id="side" style="display:none">
+      <div class="side-h"><span>Pages</span><button class="btn ghost" id="sideClose" style="padding:2px 6px">✕</button></div>
+      <div class="side-b" id="thumbs"></div>
+      <div class="side-f">
+        <button class="btn" id="pSelAll">Select all</button>
+        <button class="btn" id="pRotL" title="Rotate left">⟲</button>
+        <button class="btn" id="pRotR" title="Rotate right">⟳</button>
+        <button class="btn" id="pUp" title="Move up">↑</button>
+        <button class="btn" id="pDown" title="Move down">↓</button>
+        <button class="btn" id="pDup" title="Duplicate">Duplicate</button>
+        <button class="btn" id="pDel" title="Delete" style="color:var(--danger)">Delete</button>
+        <button class="btn" id="pExtract" title="Save selected pages as a new PDF">Extract</button>
+      </div>
+    </aside>
+    <main class="main" id="main">
+      <div class="empty" id="empty">
+        <div class="drop" id="drop">
+          <svg width="56" height="56" viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="3" width="20" height="26" rx="3" fill="#5b2d8e"/><path d="M19 3v6h6" fill="#7a45b5"/><path d="M15 22c0-5 1-9 4-12M15 22c-1-4-3-7-6-8M15 22c2-3 5-4 8-4" stroke="#e8822a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+          <h1>Open a PDF to start</h1>
+          <p>Drop a PDF or images here, or choose a file. Works offline. Your files never leave your phone.</p>
+          <button class="btn primary" id="bOpen2">Choose file</button>
+        </div>
+        <div class="feat">
+          <div><b>Read</b>Thumbnails, zoom, page jump and full-text search.</div>
+          <div><b>Annotate</b>Pen, highlighter, text, boxes and signatures.</div>
+          <div><b>Organise</b>Merge, reorder, rotate, duplicate, delete and extract pages.</div>
+          <div><b>Convert</b>Images to PDF, pages to PNG, PDF to plain text.</div>
+          <div><b>Forms</b>Fill in form fields, with an option to flatten.</div>
+          <div><b>Redact</b>Black out content; redacted pages are flattened so it's really gone.</div>
+        </div>
+      </div>
+      <div class="pages" id="pages"></div>
+    </main>
+    <aside class="side right" id="rside" style="display:none">
+      <div class="side-h"><span id="rTitle">Search</span><button class="btn ghost" id="rClose" style="padding:2px 6px">✕</button></div>
+      <div class="side-b" id="rBody"></div>
+    </aside>
+  </div>
+</div>
+<input type="file" id="fOpen" accept="application/pdf,.pdf,image/*" multiple hidden>
+<input type="file" id="fAdd" accept="application/pdf,.pdf,image/*" multiple hidden>
+<div class="selbar" id="selbar">
+  <button id="sSmaller">−</button><button id="sBigger">+</button><button id="sDelete">Delete</button><button id="sDone">Done</button>
+</div>
+<div class="scrim" id="scrim"><div class="dlg" id="dlg"></div></div>
+<div class="toast" id="toast"></div>
+<div class="busy" id="busy"><div id="busyMsg">Working…</div></div>
+
+<script type="module">
+import * as pdfjsLib from './pdf.min.js';
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const PL = window.PDFLib;
+if (!pdfjsLib || !PL) { document.body.innerHTML = '<p style="padding:24px;font-family:sans-serif">The PDF engine could not load. Check your connection and reload.</p>'; return; }
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./pdf.worker.min.js', location.href).href;
+
+const COLORS = ['#d32f2f','#1565c0','#2e7d32','#111111','#f9a825','#6a1b9a'];
+const HL_COLORS = ['#ffeb3b','#80deea','#a5d6a7','#f8bbd0'];
+const S = {
+  sources: [], pages: [], zoom: 1, tool: 'select', color: COLORS[0], hlColor: HL_COLORS[0], width: 2,
+  sel: null, selPages: new Set(), cur: 0, name: 'document', undo: [], redo: [], sig: null, nextId: 1, textCache: {}
+};
+try { S.sig = localStorage.getItem('saffron.sig') || null; } catch (e) {}
+
+/* ---------- helpers ---------- */
+const toast = (m, ms = 2600) => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', ms); };
+const busy = (m) => { $('#busyMsg').textContent = m || 'Working…'; $('#busy').style.display = m === false ? 'none' : 'flex'; };
+const hexRgb = h => { const n = parseInt(h.slice(1), 16); return PL.rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const readFile = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(new Uint8Array(r.result)); r.onerror = rej; r.readAsArrayBuffer(f); });
+const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+const NS = 'http://www.w3.org/2000/svg';
+const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+/* ---------- dialogs ---------- */
+function dialog(html, onMount) {
+  return new Promise(resolve => {
+    $('#dlg').innerHTML = html; $('#scrim').style.display = 'flex';
+    const close = v => { $('#scrim').style.display = 'none'; $('#dlg').innerHTML = ''; resolve(v); };
+    onMount && onMount($('#dlg'), close);
+    $('#dlg').querySelectorAll('[data-close]').forEach(b => b.onclick = () => close(null));
+  });
+}
+$('#scrim').addEventListener('pointerdown', e => { if (e.target.id === 'scrim') { const c = $('#dlg [data-close]'); c && c.click(); } });
+
+/* ---------- loading ---------- */
+async function loadPdfjs(bytes) {
+  const task = pdfjsLib.getDocument({ data: bytes.slice(), isEvalSupported: false });
+  task.onPassword = (update, reason) => {
+    dialog(`<h3>${reason === 2 ? 'Wrong password, try again' : 'This PDF is password-protected'}</h3>
+      <input type="password" id="pw" placeholder="Password" autofocus>
+      <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="pwOk">Open</button></div>`,
+      (d, close) => { const go = () => close($('#pw').value); $('#pwOk').onclick = go; $('#pw').onkeydown = e => e.key === 'Enter' && go(); })
+      .then(pw => pw == null ? task.destroy() : update(pw));
+  };
+  const doc = await task.promise;
+  let encrypted = false;
+  try { await PL.PDFDocument.load(bytes, { updateMetadata: false }); } catch (e) { encrypted = true; }
+  return { doc, encrypted };
+}
+
+async function imagesToPdf(files) {
+  const out = await PL.PDFDocument.create();
+  for (const f of files) {
+    const bytes = await readFile(f);
+    let img;
+    try {
+      if (/jpe?g$/i.test(f.type) || /\.jpe?g$/i.test(f.name)) img = await out.embedJpg(bytes);
+      else if (/png$/i.test(f.type) || /\.png$/i.test(f.name)) img = await out.embedPng(bytes);
+    } catch (e) { img = null; }
+    if (!img) {
+      const bmp = await createImageBitmap(new Blob([bytes], { type: f.type || 'image/*' }));
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      c.getContext('2d').drawImage(bmp, 0, 0);
+      const png = await new Promise(r => c.toBlob(r, 'image/png'));
+      img = await out.embedPng(new Uint8Array(await png.arrayBuffer()));
+    }
+    const land = img.width > img.height;
+    const W = land ? 842 : 595, H = land ? 595 : 842, m = 24;
+    const sc = Math.min((W - 2 * m) / img.width, (H - 2 * m) / img.height);
+    const w = img.width * sc, h = img.height * sc;
+    const p = out.addPage([W, H]);
+    p.drawImage(img, { x: (W - w) / 2, y: (H - h) / 2, width: w, height: h });
+  }
+  return new Uint8Array(await out.save());
+}
+
+async function addFiles(files, replace) {
+  files = [...files]; if (!files.length) return;
+  busy('Opening…');
+  try {
+    if (replace) { S.sources = []; S.pages = []; S.undo = []; S.redo = []; S.selPages.clear(); S.textCache = {}; pageEls.clear(); $('#pages').innerHTML = ''; }
+    const imgs = files.filter(f => !isPdf(f) && /^image\//.test(f.type));
+    const pdfs = files.filter(isPdf);
+    const items = [];
+    for (const f of pdfs) items.push({ name: f.name, bytes: await readFile(f) });
+    if (imgs.length) items.push({ name: imgs.length === 1 ? imgs[0].name : 'images', bytes: await imagesToPdf(imgs) });
+    if (!items.length) { toast('Please choose a PDF or image file.'); return; }
+    if (!replace) snapshot();
+    for (const it of items) {
+      let r;
+      try { r = await loadPdfjs(it.bytes); } catch (e) { toast('Could not open ' + it.name + (e && e.name === 'PasswordException' ? ' (no password)' : '')); continue; }
+      const si = S.sources.length;
+      S.sources.push({ name: it.name, bytes: it.bytes, doc: r.doc, encrypted: r.encrypted, cache: {} });
+      for (let i = 0; i < r.doc.numPages; i++) S.pages.push({ id: S.nextId++, s: si, i, rot: 0, ann: [] });
+    }
+    if (!S.pages.length) return;
+    if (replace || !S.name || S.name === 'document') S.name = (items[0].name || 'document').replace(/\.[^.]+$/, '');
+    $('#docname').textContent = S.name + '.pdf';
+    $('#empty').style.display = 'none'; $('#tools').style.display = 'flex';
+    ['#bAdd', '#bMore', '#bSave'].forEach(s => $(s).disabled = false);
+    if (replace) await fitWidth(true); else await rebuild();
+    if (!replace) toast('Added ' + items.length + ' file' + (items.length > 1 ? 's' : '') + ' to the end.');
+  } finally { busy(false); }
+}
+
+const getPage = (e) => { const src = S.sources[e.s]; return src.cache[e.i] || (src.cache[e.i] = src.doc.getPage(e.i + 1)); };
+const totalRot = (pg, e) => ((pg.rotate + e.rot) % 360 + 360) % 360;
+
+/* ---------- rendering ---------- */
+const pageEls = new Map();
+let io;
+async function rebuild() {
+  const cont = $('#pages');
+  const ids = new Set(S.pages.map(p => p.id));
+  for (const [id, o] of pageEls) if (!ids.has(id)) { o.el.remove(); pageEls.delete(id); }
+  if (io) io.disconnect();
+  io = new IntersectionObserver(ents => ents.forEach(en => { if (en.isIntersecting) renderPage(en.target._entry); }), { root: $('#main'), rootMargin: '600px 0px' });
+  for (let k = 0; k < S.pages.length; k++) {
+    const e = S.pages[k];
+    let o = pageEls.get(e.id);
+    if (!o) {
+      const el = document.createElement('div'); el.className = 'page';
+      const cv = document.createElement('canvas');
+      const ov = svgEl('svg', {}); ov.classList.add('ov');
+      const pn = document.createElement('div'); pn.className = 'pn';
+      el.append(cv, ov, pn);
+      o = { el, cv, ov, pn, key: '' }; pageEls.set(e.id, o);
+      bindOverlay(ov, e.id);
+    }
+    o.el._entry = e;
+    const pg = await getPage(e);
+    const R = totalRot(pg, e);
+    e.vp = pg.getViewport({ scale: S.zoom, rotation: R });
+    o.el.style.width = e.vp.width + 'px'; o.el.style.height = e.vp.height + 'px';
+    o.ov.setAttribute('viewBox', `0 0 ${e.vp.width} ${e.vp.height}`);
+    o.pn.textContent = (k + 1);
+    if (cont.children[k] !== o.el) cont.insertBefore(o.el, cont.children[k] || null);
+    drawOverlay(e);
+    io.observe(o.el);
+  }
+  setToolClass(); renderThumbs(); updateInd(); updateUndo();
+}
+
+async function renderPage(e) {
+  const o = pageEls.get(e.id); if (!o) return;
+  const pg = await getPage(e);
+  const R = totalRot(pg, e);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const key = S.zoom + '|' + R + '|' + dpr + '|' + (S.sources[e.s].ver || 0);
+  if (o.key === key) return; o.key = key;
+  if (o.task) { try { o.task.cancel(); } catch (x) {} }
+  const vp = pg.getViewport({ scale: S.zoom * dpr, rotation: R });
+  const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+  o.task = pg.render({ canvas: c, canvasContext: c.getContext('2d'), viewport: vp, annotationMode: pdfjsLib.AnnotationMode.ENABLE });
+  try { await o.task.promise; } catch (x) { if (o.key === key) o.key = ''; return; }
+  c.style.cssText = o.cv.style.cssText; o.cv.replaceWith(c); o.cv = c;
+}
+
+function drawOverlay(e) {
+  const o = pageEls.get(e.id); if (!o) return;
+  const ov = o.ov; ov.innerHTML = '';
+  const vp = e.vp, z = S.zoom, R = vp.rotation;
+  const V = p => vp.convertToViewportPoint(p[0], p[1]);
+  e.ann.forEach((a, idx) => {
+    let g;
+    if (a.t === 'ink') {
+      const d = a.pts.map((p, i) => { const v = V(p); return (i ? 'L' : 'M') + v[0].toFixed(1) + ' ' + v[1].toFixed(1); }).join('');
+      g = svgEl('path', { d: a.pts.length === 1 ? d + 'l0.1 0' : d, fill: 'none', stroke: a.c, 'stroke-width': a.w * z, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    } else if (a.t === 'hl' || a.t === 'rect' || a.t === 'redact') {
+      const p1 = V([a.r[0], a.r[1]]), p2 = V([a.r[2], a.r[3]]);
+      const x = Math.min(p1[0], p2[0]), y = Math.min(p1[1], p2[1]), w = Math.abs(p1[0] - p2[0]), h = Math.abs(p1[1] - p2[1]);
+      if (a.t === 'hl') g = svgEl('rect', { x, y, width: w, height: h, fill: a.c, 'fill-opacity': .4, style: 'mix-blend-mode:multiply' });
+      else if (a.t === 'rect') g = svgEl('rect', { x, y, width: w, height: h, fill: 'none', stroke: a.c, 'stroke-width': a.w * z });
+      else g = svgEl('rect', { x, y, width: w, height: h, fill: '#000' });
+    } else if (a.t === 'text') {
+      g = svgEl('g', {});
+      a.lines.forEach(L => { const v = V(L.p); const t = svgEl('text', { x: v[0], y: v[1], fill: a.c, 'font-size': a.s * z, 'font-family': 'Helvetica, Arial, sans-serif' }); t.textContent = L.txt || ' '; g.append(t); });
+      const v0 = V(a.lines[0].p);
+      if (R !== a.R) g.setAttribute('transform', `rotate(${R - a.R} ${v0[0]} ${v0[1]})`);
+    } else if (a.t === 'img') {
+      const v = V(a.p);
+      g = svgEl('image', { x: v[0], y: v[1] - a.h * z, width: a.w * z, height: a.h * z, href: a.src, preserveAspectRatio: 'none' });
+      if (R !== a.R) g.setAttribute('transform', `rotate(${R - a.R} ${v[0]} ${v[1]})`);
+    }
+    if (!g) return;
+    g.setAttribute('data-a', idx);
+    ov.append(g);
+    if (S.sel && S.sel.id === e.id && S.sel.idx === idx) {
+      requestAnimationFrame(() => { try { const b = g.getBBox(); const m = 4; const bx = svgEl('rect', { x: b.x - m, y: b.y - m, width: b.width + 2 * m, height: b.height + 2 * m, class: 'selbox' }); if (g.getAttribute('transform')) bx.setAttribute('transform', g.getAttribute('transform')); ov.append(bx); } catch (x) {} });
+    }
+  });
+}
+const redrawAll = () => S.pages.forEach(drawOverlay);
+
+/* ---------- interaction on pages ---------- */
+function bindOverlay(ov, id) {
+  let drag = null;
+  const entry = () => S.pages.find(p => p.id === id);
+  const pt = ev => { const r = ov.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  ov.addEventListener('pointerdown', ev => {
+    const e = entry(); if (!e) return;
+    const v = pt(ev), P = e.vp.convertToPdfPoint(v[0], v[1]);
+    const hit = ev.target.closest && ev.target.closest('[data-a]');
+    const T = S.tool;
+    if (T === 'select') {
+      if (!hit) { setSel(null); return; }
+      ev.preventDefault();
+      setSel({ id, idx: +hit.getAttribute('data-a') });
+      snapshot();
+      drag = { mode: 'move', last: P, moved: false };
+      return;
+    }
+    if (T === 'erase') { if (hit) { snapshot(); e.ann.splice(+hit.getAttribute('data-a'), 1); drawOverlay(e); updateUndo(); } return; }
+    ev.preventDefault();
+    if (T === 'text') { addText(e, v); return; }
+    if (T === 'sign') { placeSignature(e, v); return; }
+    ov.setPointerCapture(ev.pointerId);
+    if (T === 'ink') {
+      drag = { mode: 'ink', pts: [P], vpts: [v] };
+      drag.el = svgEl('path', { fill: 'none', stroke: S.color, 'stroke-width': S.width * S.zoom, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+      ov.append(drag.el);
+    } else {
+      drag = { mode: 'box', v0: v, P0: P };
+      const st = T === 'hl' ? { fill: S.hlColor, 'fill-opacity': .4 } : T === 'redact' ? { fill: '#000', 'fill-opacity': .7 } : { fill: 'none', stroke: S.color, 'stroke-width': S.width * S.zoom };
+      drag.el = svgEl('rect', Object.assign({ x: v[0], y: v[1], width: 0, height: 0 }, st));
+      ov.append(drag.el);
+    }
+  });
+  window.addEventListener('pointermove', ev => {
+    if (!drag) return; const e = entry(); if (!e) return;
+    const v = pt(ev), P = e.vp.convertToPdfPoint(v[0], v[1]);
+    if (drag.mode === 'move') {
+      const dx = P[0] - drag.last[0], dy = P[1] - drag.last[1]; drag.last = P;
+      if (Math.abs(dx) + Math.abs(dy) > 0) { drag.moved = true; shiftAnn(e.ann[S.sel.idx], dx, dy); drawOverlay(e); }
+    } else if (drag.mode === 'ink') {
+      drag.pts.push(P); drag.vpts.push(v);
+      drag.el.setAttribute('d', drag.vpts.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(''));
+    } else {
+      drag.P1 = P;
+      drag.el.setAttribute('x', Math.min(drag.v0[0], v[0])); drag.el.setAttribute('y', Math.min(drag.v0[1], v[1]));
+      drag.el.setAttribute('width', Math.abs(v[0] - drag.v0[0])); drag.el.setAttribute('height', Math.abs(v[1] - drag.v0[1]));
+    }
+  });
+  const end = () => {
+    if (!drag) return; const e = entry(); const d = drag; drag = null; if (!e) return;
+    if (d.mode === 'move') { if (!d.moved) S.undo.pop(); updateUndo(); return; }
+    if (d.mode === 'ink') {
+      snapshot(); e.ann.push({ t: 'ink', pts: d.pts.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]), c: S.color, w: S.width });
+    } else if (d.P1) {
+      const w = Math.abs(+d.el.getAttribute('width')), h = Math.abs(+d.el.getAttribute('height'));
+      if (w > 3 && h > 3) {
+        snapshot();
+        const r = [Math.min(d.P0[0], d.P1[0]), Math.min(d.P0[1], d.P1[1]), Math.max(d.P0[0], d.P1[0]), Math.max(d.P0[1], d.P1[1])];
+        const T = S.tool;
+        e.ann.push(T === 'hl' ? { t: 'hl', r, c: S.hlColor } : T === 'redact' ? { t: 'redact', r } : { t: 'rect', r, c: S.color, w: S.width });
+        if (T === 'redact') toast('Redaction marked. It becomes permanent when you save.');
+      }
+    }
+    drawOverlay(e); updateUndo();
+  };
+  window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+}
+
+function shiftAnn(a, dx, dy) {
+  if (a.pts) a.pts.forEach(p => { p[0] += dx; p[1] += dy; });
+  if (a.r) { a.r[0] += dx; a.r[2] += dx; a.r[1] += dy; a.r[3] += dy; }
+  if (a.p) { a.p[0] += dx; a.p[1] += dy; }
+  if (a.lines) a.lines.forEach(L => { L.p[0] += dx; L.p[1] += dy; });
+}
+
+function setSel(sel) {
+  const prev = S.sel; S.sel = sel;
+  if (prev) { const e = S.pages.find(p => p.id === prev.id); e && drawOverlay(e); }
+  if (sel) { const e = S.pages.find(p => p.id === sel.id); e && drawOverlay(e); }
+  const a = sel && (S.pages.find(p => p.id === sel.id) || {}).ann?.[sel.idx];
+  $('#selbar').style.display = a ? 'flex' : 'none';
+  const resizable = a && (a.t === 'img' || a.t === 'text');
+  $('#sSmaller').style.display = $('#sBigger').style.display = resizable ? '' : 'none';
+}
+function scaleSel(f) {
+  if (!S.sel) return; const e = S.pages.find(p => p.id === S.sel.id); const a = e.ann[S.sel.idx]; snapshot();
+  if (a.t === 'img') { a.w *= f; a.h *= f; }
+  if (a.t === 'text') {
+    const old = a.s; a.s = Math.max(4, Math.round(a.s * f * 10) / 10);
+    const p0 = a.lines[0].p, R = a.R * Math.PI / 180, k = a.s / old;
+    a.lines.forEach(L => { L.p = [p0[0] + (L.p[0] - p0[0]) * k, p0[1] + (L.p[1] - p0[1]) * k]; });
+    void R;
+  }
+  drawOverlay(e); updateUndo();
+}
+$('#sSmaller').onclick = () => scaleSel(1 / 1.15);
+$('#sBigger').onclick = () => scaleSel(1.15);
+$('#sDelete').onclick = () => { if (!S.sel) return; const e = S.pages.find(p => p.id === S.sel.id); snapshot(); e.ann.splice(S.sel.idx, 1); setSel(null); drawOverlay(e); updateUndo(); };
+$('#sDone').onclick = () => setSel(null);
+document.addEventListener('keydown', ev => {
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && S.sel) { ev.preventDefault(); $('#sDelete').click(); }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
+  if (ev.key === 'Escape') setSel(null);
+});
+
+async function addText(e, v) {
+  const sizes = [10, 12, 14, 18, 24, 32];
+  const r = await dialog(`<h3>Add text</h3>
+    <textarea id="tt" rows="3" placeholder="Type here"></textarea>
+    <label>Size</label><select id="ts">${sizes.map(s => `<option ${s === 14 ? 'selected' : ''}>${s}</option>`).join('')}</select>
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="tok">Add</button></div>`,
+    (d, close) => { setTimeout(() => $('#tt').focus(), 30); $('#tok').onclick = () => close({ txt: $('#tt').value, s: +$('#ts').value }); });
+  if (!r || !r.txt.trim()) return;
+  snapshot();
+  const z = S.zoom, lines = r.txt.replace(/\r/g, '').split('\n');
+  const ann = { t: 'text', c: S.color, s: r.s, R: e.vp.rotation, lines: lines.map((txt, k) => ({ txt, p: e.vp.convertToPdfPoint(v[0], v[1] + r.s * z * (0.85 + 1.2 * k)) })) };
+  e.ann.push(ann); drawOverlay(e); updateUndo();
+  setTool('select'); setSel({ id: e.id, idx: e.ann.length - 1 });
+}
+
+/* ---------- signature ---------- */
+async function signatureDialog() {
+  return dialog(`<h3>Your signature</h3>
+    <div class="tabs"><button class="on" id="sgDraw">Draw</button><button id="sgType">Type</button>${S.sig ? '<button id="sgSaved">Use saved</button>' : ''}</div>
+    <div id="sgArea"></div>
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn" id="sgClear">Clear</button><button class="btn primary" id="sgOk">Use signature</button></div>`,
+    (d, close) => {
+      let mode = 'draw', pad, ctx, drawn = false;
+      const area = $('#sgArea');
+      const showDraw = () => {
+        mode = 'draw'; area.innerHTML = '<canvas class="sigpad" id="pad"></canvas><div class="muted" style="margin-top:6px">Sign with your finger, stylus or mouse.</div>';
+        pad = $('#pad'); const r = pad.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1;
+        pad.width = r.width * dpr; pad.height = r.height * dpr; ctx = pad.getContext('2d'); ctx.scale(dpr, dpr);
+        ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0d1b4c'; drawn = false;
+        let down = false;
+        pad.onpointerdown = ev => { down = true; drawn = true; pad.setPointerCapture(ev.pointerId); const b = pad.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(ev.clientX - b.left, ev.clientY - b.top); };
+        pad.onpointermove = ev => { if (!down) return; const b = pad.getBoundingClientRect(); ctx.lineTo(ev.clientX - b.left, ev.clientY - b.top); ctx.stroke(); };
+        pad.onpointerup = pad.onpointercancel = () => down = false;
+      };
+      const showType = () => {
+        mode = 'type'; area.innerHTML = '<input type="text" id="sgName" placeholder="Type your name"><div id="sgPrev" style="font-family:\'Dancing Script\',cursive;font-size:42px;color:#0d1b4c;min-height:64px;margin-top:10px;text-align:center"></div>';
+        $('#sgName').oninput = () => $('#sgPrev').textContent = $('#sgName').value; setTimeout(() => $('#sgName').focus(), 30);
+      };
+      const tabs = id => d.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.id === id));
+      $('#sgDraw').onclick = () => { tabs('sgDraw'); showDraw(); };
+      $('#sgType').onclick = () => { tabs('sgType'); showType(); };
+      if ($('#sgSaved')) $('#sgSaved').onclick = () => close(S.sig);
+      $('#sgClear').onclick = () => mode === 'draw' ? showDraw() : ($('#sgName').value = '', $('#sgPrev').textContent = '');
+      $('#sgOk').onclick = async () => {
+        let c;
+        if (mode === 'draw') { if (!drawn) { toast('Draw your signature first.'); return; } c = trimCanvas(pad); }
+        else {
+          const name = $('#sgName').value.trim(); if (!name) { toast('Type your name first.'); return; }
+          try { await document.fonts.load('600 80px "Dancing Script"'); } catch (x) {}
+          const t = document.createElement('canvas'); t.width = 1600; t.height = 260; const x = t.getContext('2d');
+          x.font = '600 120px "Dancing Script", "Segoe Script", "Brush Script MT", cursive'; x.fillStyle = '#0d1b4c'; x.textBaseline = 'middle'; x.fillText(name, 20, 130); c = trimCanvas(t);
+        }
+        const url = c.toDataURL('image/png');
+        try { localStorage.setItem('saffron.sig', url); } catch (x) {}
+        close(url);
+      };
+      showDraw();
+    });
+}
+function trimCanvas(c) {
+  const ctx = c.getContext('2d'), { width: w, height: h } = c, d = ctx.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 10) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < x0) return c;
+  const pad = 6, out = document.createElement('canvas');
+  out.width = x1 - x0 + 2 * pad; out.height = y1 - y0 + 2 * pad;
+  out.getContext('2d').drawImage(c, x0 - pad, y0 - pad, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+async function placeSignature(e, v) {
+  const url = await signatureDialog(); if (!url) return;
+  S.sig = url;
+  const img = new Image(); img.src = url; await img.decode().catch(() => {});
+  const wcss = Math.min(170, e.vp.width * 0.4), hcss = wcss * (img.naturalHeight / img.naturalWidth || 0.35);
+  snapshot();
+  e.ann.push({ t: 'img', src: url, R: e.vp.rotation, p: e.vp.convertToPdfPoint(v[0] - wcss / 2, v[1] + hcss / 2), w: wcss / S.zoom, h: hcss / S.zoom });
+  drawOverlay(e); updateUndo(); setTool('select'); setSel({ id: e.id, idx: e.ann.length - 1 });
+  toast('Drag to position. Use − / + to resize.');
+}
+
+/* ---------- tools ---------- */
+function setTool(t) {
+  S.tool = t; document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  if (t !== 'select') setSel(null);
+  setToolClass(); renderSwatches();
+}
+function setToolClass() {
+  const cls = S.tool === 'select' ? 'pass' : S.tool === 'erase' ? 'erase' : 'draw';
+  for (const o of pageEls.values()) o.ov.setAttribute('class', 'ov ' + cls);
+}
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+function renderSwatches() {
+  const hl = S.tool === 'hl', list = hl ? HL_COLORS : COLORS, cur = hl ? S.hlColor : S.color;
+  $('#swatches').innerHTML = list.map(c => `<button class="sw ${c === cur ? 'on' : ''}" style="background:${c}" data-c="${c}" title="${c}"></button>`).join('');
+  $('#swatches').querySelectorAll('.sw').forEach(b => b.onclick = () => { if (hl) S.hlColor = b.dataset.c; else S.color = b.dataset.c; renderSwatches(); });
+}
+$('#wSel').onchange = () => S.width = +$('#wSel').value;
+renderSwatches();
+
+/* ---------- undo ---------- */
+function snapshot() {
+  S.undo.push(S.pages.map(p => ({ id: p.id, s: p.s, i: p.i, rot: p.rot, ann: JSON.parse(JSON.stringify(p.ann)) })));
+  if (S.undo.length > 60) S.undo.shift(); S.redo = []; updateUndo();
+}
+function restore(snap) { S.sel = null; $('#selbar').style.display = 'none'; S.pages = snap.map(p => ({ ...p, ann: JSON.parse(JSON.stringify(p.ann)) })); rebuild(); }
+const cur = () => S.pages.map(p => ({ id: p.id, s: p.s, i: p.i, rot: p.rot, ann: JSON.parse(JSON.stringify(p.ann)) }));
+function undo() { if (!S.undo.length) return; S.redo.push(cur()); restore(S.undo.pop()); }
+function redo() { if (!S.redo.length) return; S.undo.push(cur()); restore(S.redo.pop()); }
+function updateUndo() { $('#tUndo').disabled = !S.undo.length; $('#tRedo').disabled = !S.redo.length; }
+$('#tUndo').onclick = undo; $('#tRedo').onclick = redo;
+
+/* ---------- zoom & nav ---------- */
+async function setZoom(z) {
+  const main = $('#main'); const ratio = main.scrollTop / Math.max(1, main.scrollHeight);
+  S.zoom = Math.max(0.25, Math.min(5, z)); $('#zoomLbl').textContent = Math.round(S.zoom * 100) + '%';
+  await rebuild(); main.scrollTop = ratio * main.scrollHeight;
+}
+async function fitWidth(top) {
+  const pg = await getPage(S.pages[0]); const vp = pg.getViewport({ scale: 1, rotation: totalRot(pg, S.pages[0]) });
+  const avail = $('#main').clientWidth - 28;
+  await setZoom(Math.min(2.5, avail / vp.width)); if (top) $('#main').scrollTop = 0;
+}
+$('#tIn').onclick = () => setZoom(S.zoom * 1.2);
+$('#tOut').onclick = () => setZoom(S.zoom / 1.2);
+$('#tFit').onclick = () => fitWidth();
+function updateInd() {
+  const main = $('#main'), mid = main.scrollTop + main.clientHeight / 3; let k = 0;
+  S.pages.forEach((p, i) => { const o = pageEls.get(p.id); if (o && o.el.offsetTop <= mid) k = i; });
+  if (k !== S.cur) { S.cur = k; document.querySelectorAll('.thumb').forEach((t, i) => t.classList.toggle('cur', i === k)); }
+  $('#pageInd').innerHTML = S.pages.length ? `<button class="btn ghost" id="goPg" style="padding:2px 6px;font-size:12px">${k + 1} / ${S.pages.length}</button>` : '–';
+  const g = $('#goPg'); if (g) g.onclick = gotoDialog;
+}
+$('#main').addEventListener('scroll', () => { cancelAnimationFrame(updateInd.r); updateInd.r = requestAnimationFrame(updateInd); });
+async function gotoDialog() {
+  const n = await dialog(`<h3>Go to page</h3><input type="text" inputmode="numeric" id="gp" placeholder="1 – ${S.pages.length}"><div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="gpo">Go</button></div>`,
+    (d, close) => { setTimeout(() => $('#gp').focus(), 30); const go = () => close(+$('#gp').value); $('#gpo').onclick = go; $('#gp').onkeydown = e => e.key === 'Enter' && go(); });
+  if (n >= 1 && n <= S.pages.length) scrollToPage(n - 1);
+}
+function scrollToPage(k) { const o = pageEls.get(S.pages[k].id); if (o) $('#main').scrollTo({ top: o.el.offsetTop - 8, behavior: 'smooth' }); }
+let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(updateInd, 150); });
+
+/* ---------- thumbnails & organise ---------- */
+const isNarrow = () => window.innerWidth <= 820;
+$('#tPages').onclick = () => { const s = $('#side'); s.style.display = s.style.display === 'none' ? 'flex' : 'none'; if (s.style.display === 'flex') { if (isNarrow()) $('#rside').style.display = 'none'; renderThumbs(); } };
+$('#sideClose').onclick = () => $('#side').style.display = 'none';
+const thumbCache = new Map();
+let tio;
+function renderThumbs() {
+  if ($('#side').style.display === 'none') return;
+  const box = $('#thumbs'); box.innerHTML = '';
+  if (tio) tio.disconnect();
+  tio = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) drawThumb(en.target); }), { root: box, rootMargin: '200px' });
+  S.pages.forEach((p, k) => {
+    const t = document.createElement('div'); t.className = 'thumb' + (S.selPages.has(p.id) ? ' sel' : '') + (k === S.cur ? ' cur' : '');
+    t.draggable = true; t._entry = p;
+    t.innerHTML = `<div class="tc"></div><div class="ck">${S.selPages.has(p.id) ? '✓' : ''}</div><div class="tn">${k + 1}</div>`;
+    t.querySelector('.ck').onclick = ev => { ev.stopPropagation(); S.selPages.has(p.id) ? S.selPages.delete(p.id) : S.selPages.add(p.id); renderThumbs(); };
+    t.onclick = () => { scrollToPage(k); if (isNarrow()) $('#side').style.display = 'none'; };
+    t.ondragstart = ev => { ev.dataTransfer.setData('text/plain', String(k)); ev.dataTransfer.effectAllowed = 'move'; };
+    t.ondragover = ev => { ev.preventDefault(); t.classList.add('dragover'); };
+    t.ondragleave = () => t.classList.remove('dragover');
+    t.ondrop = ev => { ev.preventDefault(); t.classList.remove('dragover'); const from = +ev.dataTransfer.getData('text/plain'); if (isNaN(from) || from === k) return; snapshot(); const [m] = S.pages.splice(from, 1); S.pages.splice(k, 0, m); rebuild(); };
+    box.append(t); tio.observe(t);
+  });
+}
+async function drawThumb(t) {
+  const p = t._entry, pg = await getPage(p), R = totalRot(pg, p);
+  const key = p.s + ':' + p.i + ':' + R + ':' + (S.sources[p.s].ver || 0);
+  let url = thumbCache.get(key);
+  if (!url) {
+    const vp0 = pg.getViewport({ scale: 1, rotation: R }), vp = pg.getViewport({ scale: 240 / vp0.width, rotation: R });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    await pg.render({ canvas: c, canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    url = c.toDataURL('image/jpeg', .7); thumbCache.set(key, url);
+  }
+  const tc = t.querySelector('.tc'); if (!tc.firstChild) { const i = new Image(); i.src = url; i.style.maxWidth = '100%'; i.style.display = 'block'; tc.append(i); }
+}
+const selected = () => { const s = S.pages.filter(p => S.selPages.has(p.id)); return s.length ? s : (S.pages[S.cur] ? [S.pages[S.cur]] : []); };
+$('#pSelAll').onclick = () => { if (S.selPages.size === S.pages.length) S.selPages.clear(); else S.pages.forEach(p => S.selPages.add(p.id)); renderThumbs(); };
+const rot = d => { const s = selected(); if (!s.length) return; snapshot(); s.forEach(p => p.rot = (p.rot + d + 360) % 360); rebuild(); };
+$('#pRotL').onclick = () => rot(-90); $('#pRotR').onclick = () => rot(90);
+$('#pDel').onclick = () => {
+  const s = selected(); if (!s.length) return;
+  if (s.length >= S.pages.length) { toast('A PDF needs at least one page.'); return; }
+  snapshot(); const ids = new Set(s.map(p => p.id)); S.pages = S.pages.filter(p => !ids.has(p.id)); S.selPages.clear(); rebuild();
+};
+$('#pDup').onclick = () => {
+  const s = selected(); if (!s.length) return; snapshot();
+  s.forEach(p => { const k = S.pages.indexOf(p); S.pages.splice(k + 1, 0, { id: S.nextId++, s: p.s, i: p.i, rot: p.rot, ann: JSON.parse(JSON.stringify(p.ann)) }); });
+  rebuild();
+};
+const move = d => {
+  const s = selected(); if (!s.length) return; snapshot();
+  const order = d < 0 ? s : [...s].reverse();
+  order.forEach(p => { const k = S.pages.indexOf(p), j = k + d; if (j < 0 || j >= S.pages.length || s.includes(S.pages[j])) return; S.pages.splice(k, 1); S.pages.splice(j, 0, p); });
+  rebuild();
+};
+$('#pUp').onclick = () => move(-1); $('#pDown').onclick = () => move(1);
+$('#pExtract').onclick = async () => { const s = selected(); if (!s.length) return; await saveAs(s, S.name + '-pages.pdf'); };
+
+/* ---------- search ---------- */
+function openRight(title, html) {
+  $('#rTitle').textContent = title; $('#rBody').innerHTML = html; $('#rside').style.display = 'flex';
+  if (isNarrow()) $('#side').style.display = 'none';
+}
+$('#rClose').onclick = () => $('#rside').style.display = 'none';
+async function pageText(p) {
+  const k = p.s + ':' + p.i + ':' + (S.sources[p.s].ver || 0);
+  if (S.textCache[k] != null) return S.textCache[k];
+  const pg = await getPage(p); const tc = await pg.getTextContent();
+  let s = ''; tc.items.forEach(it => { s += it.str + (it.hasEOL ? '\n' : ''); });
+  return (S.textCache[k] = s);
+}
+$('#tSearch').onclick = () => {
+  openRight('Search', `<input type="text" id="q" placeholder="Find text" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:var(--bg)"><div id="qr" style="margin-top:10px"></div>`);
+  const q = $('#q'); setTimeout(() => q.focus(), 30);
+  let t; q.oninput = () => { clearTimeout(t); t = setTimeout(run, 250); };
+  async function run() {
+    const term = q.value.trim(); const out = $('#qr');
+    if (term.length < 2) { out.innerHTML = '<div class="muted">Type at least 2 letters.</div>'; return; }
+    out.innerHTML = '<div class="muted">Searching…</div>';
+    const rx = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); const res = []; let total = 0;
+    for (let k = 0; k < S.pages.length; k++) {
+      const txt = (await pageText(S.pages[k])).replace(/\s+/g, ' '); let m; rx.lastIndex = 0;
+      while ((m = rx.exec(txt))) { total++; if (res.length < 200) res.push({ k, snip: esc(txt.slice(Math.max(0, m.index - 40), m.index)) + '<mark>' + esc(m[0]) + '</mark>' + esc(txt.slice(m.index + m[0].length, m.index + m[0].length + 40)) }); }
+      if (q.value.trim() !== term) return;
+    }
+    out.innerHTML = `<div class="muted" style="margin-bottom:6px">${total} match${total === 1 ? '' : 'es'}${total ? '' : '. Scanned PDFs have no text to search.'}</div>` +
+      res.map(r => `<div class="res" data-k="${r.k}"><b>Page ${r.k + 1}</b> · …${r.snip}…</div>`).join('');
+    out.querySelectorAll('.res').forEach(el => el.onclick = () => { scrollToPage(+el.dataset.k); if (isNarrow()) $('#rside').style.display = 'none'; });
+  }
+};
+
+/* ---------- forms ---------- */
+$('#tForms').onclick = async () => {
+  openRight('Fill form', '<div class="muted">Reading form fields…</div>');
+  const blocks = [];
+  for (let si = 0; si < S.sources.length; si++) {
+    const src = S.sources[si]; if (src.encrypted) continue;
+    let doc; try { doc = await PL.PDFDocument.load(src.bytes); } catch (e) { continue; }
+    let fields = []; try { fields = doc.getForm().getFields(); } catch (e) {}
+    const rows = [];
+    fields.forEach((f, fi) => {
+      const n = f.getName(), type = f.constructor.name, id = `f_${si}_${fi}`;
+      try {
+        if (f instanceof PL.PDFTextField) rows.push(`<div class="field"><label>${esc(n)}</label><input type="text" id="${id}" value="${esc(f.getText() || '')}"></div>`);
+        else if (f instanceof PL.PDFCheckBox) rows.push(`<div class="field"><label><input type="checkbox" id="${id}" ${f.isChecked() ? 'checked' : ''}> ${esc(n)}</label></div>`);
+        else if (f instanceof PL.PDFDropdown || f instanceof PL.PDFRadioGroup) {
+          const opts = f.getOptions(), sel = f.getSelected(), cur = Array.isArray(sel) ? sel[0] : sel;
+          rows.push(`<div class="field"><label>${esc(n)}</label><select id="${id}"><option value=""></option>${opts.map(o => `<option ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`);
+        }
+      } catch (e) { void type; }
+    });
+    if (rows.length) blocks.push(`<div style="font-weight:600;margin:4px 0 8px">${esc(src.name)}</div>` + rows.join(''));
+  }
+  if (!blocks.length) { $('#rBody').innerHTML = '<div class="muted">This PDF has no fillable form fields. Use the Text tool to type anywhere on the page instead.</div>'; return; }
+  $('#rBody').innerHTML = blocks.join('<hr style="border:0;border-top:1px solid var(--line);margin:12px 0">') +
+    `<label class="muted" style="display:flex;gap:6px;align-items:center;margin:10px 0"><input type="checkbox" id="flat"> Flatten (lock the answers so they can't be edited)</label>
+     <button class="btn primary" id="fApply" style="width:100%;justify-content:center">Apply to document</button>`;
+  $('#fApply').onclick = async () => {
+    busy('Filling form…');
+    try {
+      for (let si = 0; si < S.sources.length; si++) {
+        const src = S.sources[si]; if (src.encrypted) continue;
+        let doc; try { doc = await PL.PDFDocument.load(src.bytes); } catch (e) { continue; }
+        let fields = []; try { fields = doc.getForm().getFields(); } catch (e) {}
+        if (!fields.length) continue;
+        fields.forEach((f, fi) => {
+          const el = document.getElementById(`f_${si}_${fi}`); if (!el) return;
+          try {
+            if (f instanceof PL.PDFTextField) f.setText(el.value);
+            else if (f instanceof PL.PDFCheckBox) el.checked ? f.check() : f.uncheck();
+            else if (f instanceof PL.PDFDropdown) el.value ? f.select(el.value) : f.clear();
+            else if (f instanceof PL.PDFRadioGroup) el.value ? f.select(el.value) : f.clear();
+          } catch (e) {}
+        });
+        if ($('#flat').checked) { try { doc.getForm().flatten(); } catch (e) {} }
+        const bytes = new Uint8Array(await doc.save());
+        const r = await loadPdfjs(bytes);
+        src.bytes = bytes; src.doc = r.doc; src.cache = {}; src.ver = (src.ver || 0) + 1;
+      }
+      for (const o of pageEls.values()) o.key = '';
+      await rebuild(); S.pages.forEach(p => { const o = pageEls.get(p.id); if (o && o.el.getBoundingClientRect().top < innerHeight * 2) renderPage(p); });
+      if (isNarrow()) $('#rside').style.display = 'none';
+      toast('Form updated. Save to keep it.');
+    } catch (e) { toast('Could not fill this form: ' + (e.message || e)); }
+    finally { busy(false); }
+  };
+};
+
+/* ---------- build & save ---------- */
+async function rasterPage(p, pg) {
+  const vp = pg.getViewport({ scale: 2.5, rotation: 0 });
+  const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  await pg.render({ canvas: c, canvasContext: ctx, viewport: vp, annotationMode: pdfjsLib.AnnotationMode.ENABLE }).promise;
+  ctx.fillStyle = '#000';
+  p.ann.filter(a => a.t === 'redact').forEach(a => {
+    const p1 = vp.convertToViewportPoint(a.r[0], a.r[1]), p2 = vp.convertToViewportPoint(a.r[2], a.r[3]);
+    ctx.fillRect(Math.min(p1[0], p2[0]), Math.min(p1[1], p2[1]), Math.abs(p1[0] - p2[0]), Math.abs(p1[1] - p2[1]));
+  });
+  return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))), 'image/jpeg', 0.9));
+}
+function textImage(a) {
+  const k = 4, lh = a.s * 1.2, c = document.createElement('canvas'), x = c.getContext('2d');
+  x.font = `${a.s * k}px Helvetica, Arial, "Noto Nastaliq Urdu", sans-serif`;
+  const w = Math.max(...a.lines.map(L => x.measureText(L.txt).width)) / k + 2;
+  c.width = Math.ceil(w * k); c.height = Math.ceil(lh * a.lines.length * k);
+  x.font = `${a.s * k}px Helvetica, Arial, sans-serif`; x.fillStyle = a.c; x.textBaseline = 'alphabetic';
+  a.lines.forEach((L, i) => x.fillText(L.txt, k, (i * lh + a.s * 0.95) * k));
+  return { url: c.toDataURL('image/png'), w, h: lh * a.lines.length };
+}
+const dataUrlBytes = u => { const b = atob(u.split(',')[1]); const a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+
+async function buildPdf(list) {
+  const out = await PL.PDFDocument.create();
+  const font = await out.embedFont(PL.StandardFonts.Helvetica);
+  const libDocs = {}, imgCache = {};
+  const embedImg = async url => imgCache[url] || (imgCache[url] = await out.embedPng(dataUrlBytes(url)));
+  for (const p of list) {
+    const src = S.sources[p.s], pg = await getPage(p), R = totalRot(pg, p);
+    const needRaster = src.encrypted || p.ann.some(a => a.t === 'redact');
+    let page, off = [0, 0];
+    if (needRaster) {
+      const [x0, y0, x1, y1] = pg.view;
+      page = out.addPage([x1 - x0, y1 - y0]);
+      const jpg = await out.embedJpg(await rasterPage(p, pg));
+      page.drawImage(jpg, { x: 0, y: 0, width: x1 - x0, height: y1 - y0 });
+      off = [-x0, -y0];
+    } else {
+      if (!libDocs[p.s]) libDocs[p.s] = await PL.PDFDocument.load(src.bytes);
+      [page] = await out.copyPages(libDocs[p.s], [p.i]);
+      out.addPage(page);
+    }
+    page.setRotation(PL.degrees(R));
+    const T = q => [q[0] + off[0], q[1] + off[1]];
+    const vp1 = pg.getViewport({ scale: 1, rotation: R });
+    for (const a of p.ann) {
+      if (a.t === 'redact') continue;
+      if (a.t === 'ink') {
+        const c = hexRgb(a.c);
+        if (a.pts.length === 1) { const q = T(a.pts[0]); page.drawCircle({ x: q[0], y: q[1], size: a.w / 2, color: c }); continue; }
+        for (let i = 1; i < a.pts.length; i++) { const s = T(a.pts[i - 1]), e = T(a.pts[i]); page.drawLine({ start: { x: s[0], y: s[1] }, end: { x: e[0], y: e[1] }, thickness: a.w, color: c, lineCap: PL.LineCapStyle.Round }); }
+      } else if (a.t === 'hl' || a.t === 'rect') {
+        const q = T([a.r[0], a.r[1]]), w = a.r[2] - a.r[0], h = a.r[3] - a.r[1];
+        if (a.t === 'hl') page.drawRectangle({ x: q[0], y: q[1], width: w, height: h, color: hexRgb(a.c), opacity: 0.4, blendMode: PL.BlendMode.Multiply });
+        else page.drawRectangle({ x: q[0], y: q[1], width: w, height: h, borderColor: hexRgb(a.c), borderWidth: a.w });
+      } else if (a.t === 'text') {
+        let ok = true; try { a.lines.forEach(L => font.widthOfTextAtSize(L.txt, a.s)); } catch (e) { ok = false; }
+        if (ok) a.lines.forEach(L => { const q = T(L.p); page.drawText(L.txt, { x: q[0], y: q[1], size: a.s, font, color: hexRgb(a.c), rotate: PL.degrees(a.R) }); });
+        else {
+          const ti = textImage(a); const img = await embedImg(ti.url);
+          const vR = pg.getViewport({ scale: 1, rotation: a.R });
+          const v0 = vR.convertToViewportPoint(a.lines[0].p[0], a.lines[0].p[1]);
+          const bl = vR.convertToPdfPoint(v0[0], v0[1] - a.s * 0.95 + ti.h);
+          const q = T(bl); page.drawImage(img, { x: q[0], y: q[1], width: ti.w, height: ti.h, rotate: PL.degrees(a.R) });
+        }
+      } else if (a.t === 'img') {
+        const img = await embedImg(a.src); const q = T(a.p);
+        page.drawImage(img, { x: q[0], y: q[1], width: a.w, height: a.h, rotate: PL.degrees(a.R) });
+      }
+    }
+    void vp1;
+  }
+  out.setProducer('Saffron PDF'); out.setTitle(S.name);
+  return new Uint8Array(await out.save());
+}
+
+const MIME = { pdf: 'application/pdf', png: 'image/png', txt: 'text/plain' };
+function offer(filename, data) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const blob = data instanceof Blob ? new Blob([data], { type: MIME[ext] || data.type }) : new Blob([data], { type: MIME[ext] || 'application/octet-stream' });
+  const file = (() => { try { return new File([blob], filename, { type: blob.type }); } catch (e) { return null; } })();
+  const canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+  const kb = blob.size > 1048576 ? (blob.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(blob.size / 1024)) + ' KB';
+  return dialog(`<h3>Your file is ready</h3><p class="muted" style="word-break:break-all">${esc(filename)} · ${kb}</p>
+    <div style="display:grid;gap:8px;margin-top:10px">
+      <button class="btn primary" id="oDl" style="justify-content:center">Save to Downloads</button>
+      ${canShare ? '<button class="btn" id="oSh" style="justify-content:center">Share or open in another app…</button>' : ''}
+    </div><div class="row"><button class="btn" data-close>Close</button></div>`, (d, close) => {
+    $('#oDl').onclick = () => {
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000); close(true);
+    };
+    if ($('#oSh')) $('#oSh').onclick = async () => {
+      try { await navigator.share({ files: [file], title: filename }); close(true); }
+      catch (e) { if (e && e.name !== 'AbortError') toast('Could not share: ' + (e.message || e)); }
+    };
+  }).then(v => !!v);
+}
+async function saveAs(list, fname) {
+  const name = await dialog(`<h3>Save PDF</h3><label>File name</label><input type="text" id="fn" value="${esc(fname.replace(/\.pdf$/i, ''))}">
+    ${list.some(p => p.ann.some(a => a.t === 'redact')) ? '<p class="muted">Pages with redactions are saved as images so the hidden content is truly removed. Text on those pages will no longer be selectable.</p>' : ''}
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="fnOk">Save</button></div>`,
+    (d, close) => { $('#fnOk').onclick = () => close(($('#fn').value.trim() || 'document').replace(/\.pdf$/i, '') + '.pdf'); });
+  if (!name) return;
+  busy('Building PDF…');
+  let bytes; try { bytes = await buildPdf(list); } catch (e) { busy(false); toast('Could not build the PDF: ' + (e.message || e), 5000); return; }
+  busy(false);
+  if (await offer(name, new Blob([bytes], { type: 'application/pdf' }))) toast('Saved ' + name + ' to your phone.');
+}
+$('#bSave').onclick = () => saveAs(S.pages, S.name + '.pdf');
+
+/* ---------- more menu ---------- */
+$('#bMore').onclick = () => dialog(`<h3>More</h3>
+  <div style="display:grid;gap:8px">
+    <button class="btn" id="mPng">Save current page as image (PNG)</button>
+    <button class="btn" id="mTxt">Export all text (.txt)</button>
+    <button class="btn" id="mSplit">Split: save a page range as a new PDF</button>
+    <button class="btn" id="mRename">Rename document</button>
+    <button class="btn" id="mClose" style="color:var(--danger)">Close document</button>
+  </div><div class="row"><button class="btn" data-close>Done</button></div>`, (d, close) => {
+  $('#mPng').onclick = () => { close(); savePng(); };
+  $('#mTxt').onclick = () => { close(); exportText(); };
+  $('#mSplit').onclick = () => { close(); splitDialog(); };
+  $('#mRename').onclick = async () => {
+    close();
+    const n = await dialog(`<h3>Rename</h3><input type="text" id="rn" value="${esc(S.name)}"><div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="rnOk">Rename</button></div>`, (d2, c2) => $('#rnOk').onclick = () => c2($('#rn').value.trim()));
+    if (n) { S.name = n.replace(/\.pdf$/i, ''); $('#docname').textContent = S.name + '.pdf'; }
+  };
+  $('#mClose').onclick = () => { close(); location.hash = ''; S.sources = []; S.pages = []; pageEls.clear(); $('#pages').innerHTML = ''; $('#empty').style.display = ''; $('#tools').style.display = 'none'; $('#side').style.display = 'none'; $('#rside').style.display = 'none'; $('#docname').textContent = ''; ['#bAdd', '#bMore', '#bSave'].forEach(s => $(s).disabled = true); setSel(null); };
+});
+async function savePng() {
+  const p = S.pages[S.cur]; if (!p) return; busy('Rendering page…');
+  try {
+    const pg = await getPage(p), R = totalRot(pg, p), sc = 2.5;
+    const vp = pg.getViewport({ scale: sc, rotation: R });
+    const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    await pg.render({ canvas: c, canvasContext: ctx, viewport: vp, annotationMode: pdfjsLib.AnnotationMode.ENABLE }).promise;
+    const o = pageEls.get(p.id);
+    if (o && p.ann.length) {
+      const clone = o.ov.cloneNode(true); clone.querySelectorAll('.selbox').forEach(n => n.remove());
+      clone.setAttribute('xmlns', NS); clone.setAttribute('width', c.width); clone.setAttribute('height', c.height);
+      const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }));
+      const im = new Image(); im.src = url; await im.decode(); ctx.drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    }
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    busy(false);
+    if (await offer(`${S.name}-page-${S.cur + 1}.png`, blob)) toast('Page saved as PNG.');
+  } catch (e) { busy(false); toast('Could not export image: ' + (e.message || e)); }
+}
+async function exportText() {
+  busy('Extracting text…'); let s = '';
+  for (let k = 0; k < S.pages.length; k++) s += `--- Page ${k + 1} ---\n` + (await pageText(S.pages[k])) + '\n\n';
+  busy(false);
+  if (!s.replace(/--- Page \d+ ---|\s/g, '')) { toast('No text found. This may be a scanned PDF.'); return; }
+  if (await offer(S.name + '.txt', s)) toast('Text exported.');
+}
+async function splitDialog() {
+  const r = await dialog(`<h3>Split</h3><p class="muted">Pages to save, e.g. <b>1-3, 5, 8-10</b> (of ${S.pages.length}).</p>
+    <input type="text" id="rg" placeholder="1-3, 5"><div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="rgOk">Next</button></div>`,
+    (d, close) => { setTimeout(() => $('#rg').focus(), 30); $('#rgOk').onclick = () => close($('#rg').value); });
+  if (!r) return;
+  const idx = [];
+  r.split(',').forEach(part => { const m = part.trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/); if (!m) return; let a = +m[1], b = +(m[2] || m[1]); if (a > b) [a, b] = [b, a]; for (let k = a; k <= b; k++) if (k >= 1 && k <= S.pages.length) idx.push(k - 1); });
+  if (!idx.length) { toast('No valid pages in that range.'); return; }
+  await saveAs(idx.map(k => S.pages[k]), `${S.name}-${r.replace(/[^\d,-]/g, '').replace(/,/g, '_')}.pdf`);
+}
+
+window.__saffron = { S, buildPdf, addFiles };
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+(async () => {
+  if (!/[?&]shared=1/.test(location.search) || !('caches' in window)) return;
+  try {
+    const c = await caches.open('saffron-share'); const keys = await c.keys(); const files = [];
+    for (const k of keys) { const r = await c.match(k); const b = await r.blob(); files.push(new File([b], decodeURIComponent(r.headers.get('x-name') || 'shared.pdf'), { type: b.type })); await c.delete(k); }
+    history.replaceState(null, '', location.pathname);
+    if (files.length) addFiles(files, true);
+  } catch (e) { toast('Could not open the shared file.'); }
+})();
+/* ---------- open / drop ---------- */
+$('#bOpen').onclick = $('#bOpen2').onclick = () => $('#fOpen').click();
+$('#bAdd').onclick = () => $('#fAdd').click();
+$('#fOpen').onchange = e => { addFiles(e.target.files, true); e.target.value = ''; };
+$('#fAdd').onchange = e => { addFiles(e.target.files, false); e.target.value = ''; };
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); $('#drop').classList.add('over'); } }));
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) $('#drop').classList.remove('over'); });
+document.addEventListener('drop', e => {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); $('#drop').classList.remove('over');
+  addFiles(e.dataTransfer.files, !S.pages.length);
+});
+})();
+</script>
+</body>
+</html>
